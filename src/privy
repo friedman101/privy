@@ -1,47 +1,15 @@
 #!/usr/bin/python3
 
 import argparse
-import socket
 import sys, select
 import signal
+import curses
+from curses import wrapper
 
-port = 49201
+from privy_io import *
+from privy_ui import ChatUI
 
-def send(s, msg):
-    try:
-        s.send(msg.encode())
-    except:
-        return
-
-def receive(s):
-    try:
-        data = s.recv(1024)
-    except:
-        return
-    if not data:
-        return
-    print (">", data.decode())
-
-def setup_socket():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    return s
-
-def config_client_socket(s, TCP_PORT):
-    s.connect((ip, TCP_PORT))
-
-def config_server_socket(s, TCP_PORT):
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind(('127.0.0.1', TCP_PORT))
-    s.listen(1)
-    s, ip = s.accept()
-    return s
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-d', help='act as the server', action='store_true')
-    parser.add_argument('ip', nargs='?', help='ip to send message to')
-
-    args = parser.parse_args()
+def main(stdscr, args):
 
     s = setup_socket()
 
@@ -59,18 +27,34 @@ if __name__ == '__main__':
         if not ip:
             parser.print_help()
             sys.exit(0)
-        config_client_socket(s, TCP_PORT)
+        config_client_socket(s, ip, TCP_PORT)
 
-    print('connection established')
     s.setblocking(0)
 
-    sendStr = ''
-    while 1:
-        i, o, e = select.select( [sys.stdin], [], [], 0.1 )
-        if i:
-            newStr = sys.stdin.readline().strip()
-            sendStr = sendStr + newStr
-            send(s, sendStr)
-            sendStr = ''
-        receive(s)
+    stdscr.clear()
+    ui = ChatUI(stdscr)
+    name = "me"
+    ui.userlist.append(name)
+    ui.redraw_userlist()
+    inp = ""
+    while inp != "/quit":
+        inp = ui.wait_input()
+        ui.chatbuffer_add("me: " + inp)
+        send(s, inp)
+        out = receive(s)
+        if out:
+            ui.chatbuffer_add("them: " + out)
+
+    s.close()
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', help='act as the server', action='store_true')
+    parser.add_argument('ip', nargs='?', help='ip to send message to')
+
+    args = parser.parse_args()
+
+    wrapper(main, args)
+
 
