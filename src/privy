@@ -6,30 +6,18 @@ import signal
 import curses
 from curses import wrapper
 
-from privy_io import *
+from privy_io import PrivyIO
 from privy_ui import ChatUI
 
 def main(stdscr, args):
 
-    s = setup_socket()
+    io = PrivyIO(args.d, 2324, args.ip)
 
     def signal_handler(signal, frame):
-        s.close()
+        io.close_socket()
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
-
-    TCP_PORT = 21131
-    if args.d:
-        s = config_server_socket(s, TCP_PORT)
-    else:
-        ip = args.ip
-        if not ip:
-            parser.print_help()
-            sys.exit(0)
-        config_client_socket(s, ip, TCP_PORT)
-
-    s.setblocking(0)
 
     stdscr.clear()
     ui = ChatUI(stdscr)
@@ -40,12 +28,12 @@ def main(stdscr, args):
     while inp != "/quit":
         inp = ui.wait_input()
         ui.chatbuffer_add("me: " + inp)
-        send(s, inp)
-        out = receive(s)
+        io.send(inp)
+        out = io.receive()
         if out:
             ui.chatbuffer_add("them: " + out)
 
-    s.close()
+    io.close_socket()
 
 
 if __name__ == '__main__':
